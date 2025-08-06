@@ -97,7 +97,7 @@ function getRecentRSIDiff(rsi, lookback = 14) {
   for (const value of recentRSI) {
     if (!isNaN(value)) {
       if (value > recentHigh) recentHigh = value;
-      if (value < recentLow) recentLow = value;
+      if (value < recentLow) low = value; // Changed 'low' to 'recentLow'
     }
   }
 
@@ -168,7 +168,7 @@ export default function App() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('1d'); // Default to 1d
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null); // New state for last updated timestamp
+  const [lastUpdated, setLastUpdated] = useState(null); // Removed TypeScript type annotation
 
   // Utility to generate UTC timestamp at specific hour
   const getUTCMillis = (year, month, date, hour, minute) => {
