@@ -92,12 +92,12 @@ function getRecentRSIDiff(rsi, lookback = 14) {
 
   const recentRSI = rsi.slice(-lookback);
   let recentHigh = -Infinity;
-  let recentLow = Infinity;
+  let recentLow = Infinity; // Correctly declared here
 
   for (const value of recentRSI) {
     if (!isNaN(value)) {
       if (value > recentHigh) recentHigh = value;
-      if (value < recentLow) low = value; // Changed 'low' to 'recentLow'
+      if (value < recentLow) recentLow = value; // Fixed: Changed 'low' to 'recentLow'
     }
   }
 
@@ -133,8 +133,9 @@ const getSignal = (s) => {
   const pump = pumpDump.pumpStrength;
   const dump = pumpDump.dumpStrength;
 
+  // Corrected the 'inRange' function logic as it was `val >= min && val >= max` instead of `val >= min && val <= max`
   const inRange = (val, min, max) =>
-    val !== undefined && val >= min && val <= max; // Corrected: val >= min && val <= max
+    val !== undefined && val >= min && val <= max;
 
   const isAbove30 = (val) =>
     val !== undefined && val >= 30;
