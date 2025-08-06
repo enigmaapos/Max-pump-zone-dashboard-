@@ -169,7 +169,7 @@ export default function App() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('1d'); // Default to 1d
-  const [lastUpdated, setLastUpdated] = useState(null); // Removed TypeScript type annotation
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // Utility to generate UTC timestamp at specific hour
   const getUTCMillis = (year, month, date, hour, minute) => {
@@ -465,6 +465,33 @@ export default function App() {
     return signals.filter(s => getSignal(s) === 'MAX ZONE PUMP');
   }, [signals]);
 
+  // Calculate statistics for the "Market Overview" section
+  const marketStats = useMemo(() => {
+    const greenPriceChangeCount = signals.filter(
+      (t) => parseFloat(t.priceChangePercent) > 0
+    ).length;
+
+    const redPriceChangeCount = signals.filter(
+      (t) => parseFloat(t.priceChangePercent) < 0
+    ).length;
+
+    const greenVolumeCount = signals.filter(
+      (s) => s.highestVolumeColorPrev === 'green'
+    ).length;
+
+    const redVolumeCount = signals.filter(
+      (s) => s.highestVolumeColorPrev === 'red'
+    ).length;
+
+    return {
+      greenPriceChangeCount,
+      redPriceChangeCount,
+      greenVolumeCount,
+      redVolumeCount,
+    };
+  }, [signals]);
+
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
@@ -494,6 +521,31 @@ export default function App() {
                 Last updated: <span className="font-medium text-gray-200">{lastUpdated}</span>
             </p>
         )}
+
+        {/* Market Overview Section */}
+        <div className="bg-gray-800 rounded-xl shadow-xl p-4 sm:p-6 mb-8 border border-blue-700">
+            <h2 className="text-xl sm:text-2xl font-bold text-blue-300 mb-4 text-center">
+                Market Overview
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                <div className="p-3 bg-gray-700 rounded-lg">
+                    <p className="text-sm text-gray-400">Green Price Change</p>
+                    <p className="text-lg font-semibold text-green-400">{marketStats.greenPriceChangeCount}</p>
+                </div>
+                <div className="p-3 bg-gray-700 rounded-lg">
+                    <p className="text-sm text-gray-400">Red Price Change</p>
+                    <p className="text-lg font-semibold text-red-400">{marketStats.redPriceChangeCount}</p>
+                </div>
+                <div className="p-3 bg-gray-700 rounded-lg">
+                    <p className="text-sm text-gray-400">Green Volume (Prev Session)</p>
+                    <p className="text-lg font-semibold text-green-400">{marketStats.greenVolumeCount}</p>
+                </div>
+                <div className="p-3 bg-gray-700 rounded-lg">
+                    <p className="text-sm text-gray-400">Red Volume (Prev Session)</p>
+                    <p className="text-lg font-semibold text-red-400">{marketStats.redVolumeCount}</p>
+                </div>
+            </div>
+        </div>
 
         {loading && (
           <div className="text-center text-lg text-gray-400 mt-10">
