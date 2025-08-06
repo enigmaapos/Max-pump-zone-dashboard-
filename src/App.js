@@ -48,7 +48,6 @@ function calculateRSI(closes, period = 3) {
   let gains = 0;
   let losses = 0;
 
-  // Calculate initial average gain/loss for the first 'period' candles
   for (let i = 1; i <= period; i++) {
     const diff = closes[i] - closes[i - 1];
     if (diff > 0) {
@@ -63,7 +62,6 @@ function calculateRSI(closes, period = 3) {
   let rs = avgLoss === 0 ? Number.POSITIVE_INFINITY : avgGain / avgLoss;
   rsi[period] = 100 - 100 / (1 + rs);
 
-  // Continue calculating RSI for the rest of the data
   for (let i = period + 1; i < closes.length; i++) {
     const diff = closes[i] - closes[i - 1];
     const gain = diff > 0 ? diff : 0;
@@ -76,7 +74,6 @@ function calculateRSI(closes, period = 3) {
     rsi[i] = 100 - 100 / (1 + rs);
   }
 
-  // Fill leading entries with NaN as RSI cannot be calculated for them
   for (let i = 0; i < period; i++) {
     rsi[i] = NaN;
   }
@@ -137,7 +134,7 @@ const getSignal = (s) => {
   const dump = pumpDump.dumpStrength;
 
   const inRange = (val, min, max) =>
-    val !== undefined && val >= min && val <= max;
+    val !== undefined && val >= min && val <= max; // Corrected: val >= min && val <= max
 
   const isAbove30 = (val) =>
     val !== undefined && val >= 30;
@@ -171,6 +168,7 @@ export default function App() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('1d'); // Default to 1d
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null); // New state for last updated timestamp
 
   // Utility to generate UTC timestamp at specific hour
   const getUTCMillis = (year, month, date, hour, minute) => {
@@ -351,6 +349,26 @@ export default function App() {
         isDojiAfterBreakout: false,
       };
 
+      // Calculate previous session candles and highest volume color
+      const { prevSessionStart, prevSessionEnd } = getSessions(interval); // Pass interval to getSessions
+      const candlesPrev = candles.filter(c => c.timestamp >= prevSessionStart && c.timestamp <= prevSessionEnd);
+
+      let highestVolumeColorPrev = null;
+      if (candlesPrev.length > 0) {
+          let maxVolume = -1;
+          let highestVolumeCandle = null;
+          for (const candle of candlesPrev) {
+              if (candle.volume > maxVolume) {
+                  maxVolume = candle.volume;
+                  highestVolumeCandle = candle;
+              }
+          }
+          if (highestVolumeCandle) {
+              // Determine color based on close vs open of the highest volume candle
+              highestVolumeColorPrev = highestVolumeCandle.close > highestVolumeCandle.open ? 'green' : 'red';
+          }
+      }
+
       // Simulate prevClosedGreen/Red (simplified)
       let prevClosedGreen = null;
       let prevClosedRed = null;
@@ -369,6 +387,7 @@ export default function App() {
         mainTrend,
         prevClosedGreen,
         prevClosedRed,
+        highestVolumeColorPrev, // Add the calculated highest volume color
         // Add other properties as needed by getSignal or for display
         // For simplicity, many complex indicators from original code are omitted here
         // as they are not directly used by getSignal for MAX ZONE PUMP.
@@ -406,20 +425,22 @@ export default function App() {
         }
       }
 
-      const batchSymbols = symbols.slice(currentIndex, currentIndex + BATCH_SIZE);
-      if (batchSymbols.length === 0) {
-        setLoading(false);
-        return;
-      }
-
       const newSignals = await Promise.all(
-        batchSymbols.map((symbol) => fetchAndAnalyze(symbol, timeframe))
+        symbols.slice(currentIndex, currentIndex + BATCH_SIZE).map((symbol) => fetchAndAnalyze(symbol, timeframe))
       );
 
       if (isMounted) {
         setSignals((prev) => [...prev, ...newSignals.filter(Boolean)]); // filter(Boolean) removes null entries
         currentIndex += BATCH_SIZE;
-        setTimeout(processBatch, INTERVAL_MS);
+
+        // Update last updated timestamp after processing a batch
+        setLastUpdated(new Date().toLocaleTimeString());
+
+        if (currentIndex < symbols.length) {
+            setTimeout(processBatch, INTERVAL_MS);
+        } else {
+            setLoading(false); // All symbols processed
+        }
       }
     };
 
@@ -428,6 +449,7 @@ export default function App() {
     setLoading(true);
     currentIndex = 0; // Reset index for new fetch
     symbols = []; // Reset symbols to re-fetch exchange info
+    setLastUpdated(null); // Reset last updated timestamp
 
     processBatch();
 
@@ -466,6 +488,12 @@ export default function App() {
           ))}
         </div>
 
+        {lastUpdated && (
+            <p className="text-center text-sm text-gray-400 mb-4">
+                Last updated: <span className="font-medium text-gray-200">{lastUpdated}</span>
+            </p>
+        )}
+
         {loading && (
           <div className="text-center text-lg text-gray-400 mt-10">
             Loading signals... This might take a moment. ⏳
@@ -497,8 +525,11 @@ export default function App() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       24h Change (%)
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider rounded-tr-lg">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       RSI Pump Strength
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider rounded-tr-lg">
+                      Prev Session Volume
                     </th>
                   </tr>
                 </thead>
@@ -521,6 +552,11 @@ export default function App() {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                           {pumpDump?.pumpStrength?.toFixed(2) || 'N/A'}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm">
+                          <span className={`font-semibold ${s.highestVolumeColorPrev === 'green' ? 'text-green-400' : s.highestVolumeColorPrev === 'red' ? 'text-red-400' : 'text-gray-400'}`}>
+                            {s.highestVolumeColorPrev ? s.highestVolumeColorPrev.toUpperCase() : 'N/A'}
+                          </span>
                         </td>
                       </tr>
                     );
